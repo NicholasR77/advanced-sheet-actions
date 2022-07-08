@@ -1,0 +1,48 @@
+name: NodeJS with Webpack
+
+on: 
+  workflow_dispatch:
+    inputs:
+      foldername:
+        type: string
+        description: 'The name of the character sheet folder'
+        required: true
+      shortname:
+        type: string
+        description: 'The shortname of the sheet from approved.yaml'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [12.x, 14.x, 16.x]
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        node-version: ${{ matrix.node-version }}
+
+    - name: Add storage secret
+      env:
+          STORAGE_KEYFILE: ${{ secrets.STORAGE_KEYFILE }}
+      run: |
+        echo "$STORAGE_KEYFILE" >> cloud-storage-cdn.keyfile.json
+
+    - name: Build
+      env:
+        FOLDERNAME: ${{ github.event.inputs.foldername }}
+        SHORTNAME: ${{ github.event.inputs.shortname }}
+        GITHUB_PAT: ${{ secrets.WEBPACK_TOKEN }}
+      run: |
+        echo "//npm.pkg.github.com/:_authToken=$GITHUB_PAT" >> ~/.npmrc
+        echo "@roll20:registry=https://npm.pkg.github.com" >> ~/.npmrc
+        npm install
+        npm install --prefix ./$FOLDERNAME
+        npm run build -- --env SHORTNAME=$SHORTNAME FOLDERNAME=$FOLDERNAME MODE=production
